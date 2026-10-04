@@ -27,29 +27,43 @@ async function generateWhy() {
                     headers: {
                         "Content-Type":
                             "application/json"
-                    }
+                    },
+                    body: JSON.stringify({})
                 }
             );
+
+
+        const responseText =
+            await response.text();
 
 
         if (!response.ok) {
 
             throw new Error(
-                `请求失败：${response.status}`
+                `请求失败：${response.status}\n${responseText}`
             );
         }
 
 
-        const data =
-            await response.json();
+        let data;
 
+        try {
 
-        if (
-            !data.question
-        ) {
+            data =
+                JSON.parse(responseText);
+
+        } catch (error) {
 
             throw new Error(
-                "服务器没有返回问题"
+                `服务器返回的不是 JSON：\n${responseText}`
+            );
+        }
+
+
+        if (!data.question) {
+
+            throw new Error(
+                `服务器没有返回 question：\n${responseText}`
             );
         }
 
@@ -85,12 +99,15 @@ async function generateWhy() {
 
         console.error(error);
 
+
         questionElement.textContent =
-            "生成失败，请再试一次。";
+            `生成失败：${error.message}`;
+
 
         questionElement.classList.remove(
             "question-clickable"
         );
+
 
         questionElement.onclick =
             null;
@@ -99,6 +116,7 @@ async function generateWhy() {
     } finally {
 
         whyButton.disabled = false;
+
         whyButton.textContent =
             "摇一个为什么";
     }
