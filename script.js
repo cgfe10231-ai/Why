@@ -10,7 +10,7 @@ button.addEventListener("click", async () => {
     try {
 
         const response = await fetch(
-            "https://why-api.cgfe10231.workers.dev/",
+            "https://why-api.cgfe10231.workers.dev/api/why",
             {
                 method: "POST",
                 headers: {

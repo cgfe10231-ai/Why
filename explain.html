@@ -1,57 +1,126 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>解释</title>
+    <title>为什么</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <main class="explain-page">
+    <main class="why-page">
 
-        <h1 id="questionTitle"></h1>
+        <h1 id="question"></h1>
 
-        <p id="answer"></p>
+        <div id="explanation">
+            解释生成中……
+        </div>
 
-        <button onclick="history.back()">返回</button>
+        <button id="backButton">
+            返回
+        </button>
 
     </main>
 
     <script>
-        const whyList = [
-            {
-                question: "为什么天空是蓝色的？",
-                answer: "因为太阳光进入大气层后，会被空气分子散射。其中短波长的蓝光比红光更容易被散射，所以从地面看，天空大部分时候呈现蓝色。"
-            },
-            {
-                question: "为什么人会打哈欠？",
-                answer: "打哈欠与大脑觉醒状态、睡眠和疲劳等因素有关。人在困倦或状态切换时，更容易出现打哈欠。它并不是单纯因为缺氧。"
-            },
-            {
-                question: "为什么冰会浮在水面上？",
-                answer: "因为水结冰时，分子排列形成较为疏松的晶体结构，体积增大，因此冰的密度小于液态水，所以会浮在水面上。"
-            },
-            {
-                question: "为什么人睡觉时会做梦？",
-                answer: "做梦主要发生在睡眠过程中，尤其常见于快速眼动睡眠。大脑在睡眠时并没有完全停止活动，记忆、情绪和感觉信息仍会被重新处理，因此会形成梦境体验。"
+
+        const questionElement =
+            document.getElementById("question");
+
+        const explanationElement =
+            document.getElementById("explanation");
+
+        const backButton =
+            document.getElementById("backButton");
+
+
+        const params =
+            new URLSearchParams(window.location.search);
+
+        const question =
+            params.get("question");
+
+
+        if (!question) {
+
+            questionElement.textContent =
+                "没有找到问题";
+
+            explanationElement.textContent =
+                "请返回上一页重新生成。";
+
+        } else {
+
+            questionElement.textContent =
+                question;
+
+            generateExplanation(question);
+        }
+
+
+        async function generateExplanation(question) {
+
+            try {
+
+                const response = await fetch(
+                    "https://why-api.cgfe10231.workers.dev/api/explain",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+
+                        body: JSON.stringify({
+                            question: question
+                        })
+                    }
+                );
+
+
+                if (!response.ok) {
+                    throw new Error(
+                        "服务器返回错误"
+                    );
+                }
+
+
+                const data =
+                    await response.json();
+
+
+                if (!data.explanation) {
+                    throw new Error(
+                        "没有收到解释"
+                    );
+                }
+
+
+                explanationElement.textContent =
+                    data.explanation;
+
+
+            } catch (error) {
+
+                console.error(error);
+
+                explanationElement.textContent =
+                    "解释生成失败，请返回后重试。";
             }
-        ];
+        }
 
-        const params = new URLSearchParams(window.location.search);
-        const question = params.get("question");
 
-        const result = whyList.find(
-            item => item.question === question
+        backButton.addEventListener(
+            "click",
+            () => {
+                window.history.back();
+            }
         );
 
-        document.getElementById("questionTitle").textContent =
-            result ? result.question : "没有找到这个问题";
-
-        document.getElementById("answer").textContent =
-            result ? result.answer : "暂时没有对应的解释。";
     </script>
 
 </body>
+
 </html>
