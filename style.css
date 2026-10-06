@@ -2,11 +2,12 @@
     box-sizing: border-box;
 }
 
+html {
+    -webkit-text-size-adjust: 100%;
+}
 
 body {
-
     margin: 0;
-
     font-family:
         -apple-system,
         BlinkMacSystemFont,
@@ -14,70 +15,45 @@ body {
         sans-serif;
 
     color: #222;
-
     background: #ffffff;
 }
 
-
 button {
-
     border: none;
-
     border-radius: 10px;
-
-    padding:
-        12px
-        20px;
-
+    padding: 12px 20px;
     font-size: 16px;
-
     cursor: pointer;
 
     background: #222;
-
     color: white;
 }
 
-
 button:disabled {
-
     opacity: 0.6;
-
     cursor: default;
 }
 
 
-/* =========================
+/* ==================================================
    首页
-   ========================= */
+================================================== */
 
 .why-page {
-
     max-width: 700px;
-
-    margin:
-        120px
-        auto;
-
-    padding:
-        20px;
+    margin: 120px auto;
+    padding: 20px;
 }
 
-
 .why-page h1 {
-
     margin-bottom: 30px;
-
     font-size: 36px;
 }
 
-
 #question {
-
     margin-top: 40px;
 
     font-size: 25px;
-
     line-height: 1.7;
 
     cursor: default;
@@ -88,53 +64,34 @@ button:disabled {
         opacity 0.2s ease;
 }
 
-
 #question.visible {
-
     opacity: 1;
-
 }
 
-
 #question:not(:empty) {
-
     cursor: pointer;
 }
 
 
-/* =========================
+/* ==================================================
    解释页
-   ========================= */
+================================================== */
 
 .explain-page {
-
     max-width: 760px;
-
-    margin:
-        70px
-        auto;
-
-    padding:
-        20px;
+    margin: 70px auto;
+    padding: 20px;
 }
 
-
 .explain-page h1 {
-
     margin-bottom: 35px;
 
     font-size: 32px;
-
     line-height: 1.5;
 }
 
-
-/* 核心回答 */
-
 .explanation-summary {
-
     padding: 22px;
-
     margin-bottom: 35px;
 
     border-radius: 12px;
@@ -142,77 +99,45 @@ button:disabled {
     background: #f5f5f5;
 
     font-size: 19px;
-
     font-weight: 600;
-
     line-height: 1.8;
 }
 
-
-/* 每一个知识点 */
-
 .explanation-point {
-
     margin-bottom: 32px;
 }
 
-
 .explanation-point h2 {
-
-    margin:
-        0
-        0
-        10px;
+    margin: 0 0 10px;
 
     font-size: 20px;
-
     line-height: 1.5;
 }
 
-
 .explanation-point p {
-
     margin: 0;
 
     font-size: 17px;
-
     line-height: 1.9;
 }
-
-
-/* 最后总结 */
 
 .explanation-conclusion {
-
     margin-top: 35px;
-
     padding-top: 25px;
 
-    border-top:
-        1px solid #ddd;
+    border-top: 1px solid #ddd;
 
     font-size: 17px;
-
     line-height: 1.9;
 }
 
-
-/* 加载 */
-
 .loading {
-
     font-size: 17px;
-
     line-height: 1.8;
-
     color: #666;
 }
 
-
-/* 错误 */
-
 .error {
-
     padding: 20px;
 
     border-radius: 10px;
@@ -222,10 +147,714 @@ button:disabled {
     line-height: 1.8;
 }
 
-
-/* 返回按钮 */
-
 #backButton {
-
     margin-top: 40px;
+}
+
+
+/* ==================================================
+   详细解释页
+================================================== */
+
+.detail-page {
+    width: min(calc(100% - 32px),
+            900px);
+
+    margin: 0 auto;
+
+    padding:
+        56px 0 72px;
+}
+
+
+/* ---------- 顶部 ---------- */
+
+.detail-header {
+    margin-bottom: 44px;
+}
+
+.detail-eyebrow {
+    margin-bottom: 14px;
+
+    font-size: 13px;
+    font-weight: 700;
+
+    letter-spacing: 0.16em;
+
+    color: #888;
+}
+
+.detail-header h1 {
+    margin: 0;
+
+    font-size: clamp(30px,
+            5vw,
+            44px);
+
+    line-height: 1.35;
+    font-weight: 750;
+
+    letter-spacing: -0.02em;
+}
+
+.detail-header-line {
+    width: 44px;
+    height: 4px;
+
+    margin-top: 24px;
+
+    border-radius: 999px;
+
+    background: #222;
+}
+
+
+/* ---------- Loading ---------- */
+
+.detail-loading-card {
+    min-height: 190px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 18px;
+
+    border:
+        1px solid #e8e8e8;
+
+    border-radius: 18px;
+
+    background: #fafafa;
+}
+
+.loading-spinner {
+    width: 26px;
+    height: 26px;
+
+    border:
+        3px solid #e7e7e7;
+
+    border-top-color: #222;
+
+    border-radius: 50%;
+
+    animation:
+        loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+/* ---------- 通用区块 ---------- */
+
+.detail-block {
+    margin-top: 48px;
+}
+
+.block-title {
+    display: flex;
+
+    align-items: baseline;
+
+    gap: 10px;
+
+    margin-bottom: 20px;
+
+    font-size: 22px;
+    font-weight: 750;
+
+    letter-spacing: -0.01em;
+}
+
+.block-title span {
+    font-size: 13px;
+
+    color: #999;
+
+    letter-spacing: 0.08em;
+
+    font-variant-numeric:
+        tabular-nums;
+}
+
+
+/* ---------- 通用卡片 ---------- */
+
+.detail-card {
+    border:
+        1px solid #e7e7e7;
+
+    border-radius: 18px;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 8px 30px rgba(0, 0, 0, 0.035);
+}
+
+
+/* ---------- Summary ---------- */
+
+.summary-card {
+    position: relative;
+
+    padding:
+        28px 30px 30px;
+}
+
+.summary-card::before {
+    content: "";
+
+    position: absolute;
+
+    top: 0;
+    left: 0;
+
+    width: 5px;
+    height: 100%;
+
+    border-radius:
+        18px 0 0 18px;
+
+    background: #222;
+}
+
+.card-label {
+    margin-bottom: 14px;
+
+    font-size: 13px;
+    font-weight: 700;
+
+    color: #888;
+
+    letter-spacing: 0.08em;
+}
+
+.summary-text {
+    font-size: 20px;
+    font-weight: 650;
+
+    line-height: 1.85;
+
+    letter-spacing: 0.01em;
+}
+
+
+/* ---------- 详细原因 ---------- */
+
+.section-list {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 14px;
+}
+
+.explanation-card {
+    display: grid;
+
+    grid-template-columns:
+        46px minmax(0, 1fr);
+
+    gap: 10px;
+
+    padding:
+        25px 24px;
+}
+
+.section-index {
+    font-size: 13px;
+    font-weight: 700;
+
+    color: #aaa;
+
+    padding-top: 3px;
+
+    font-variant-numeric:
+        tabular-nums;
+}
+
+.section-body h2 {
+    margin: 0 0 10px;
+
+    font-size: 19px;
+    line-height: 1.55;
+}
+
+.section-body p {
+    margin: 0;
+
+    font-size: 16px;
+
+    line-height: 1.95;
+
+    color: #444;
+}
+
+
+/* ---------- 比较数据 ---------- */
+
+.comparison-list {
+    display: grid;
+
+    grid-template-columns:
+        repeat(auto-fit,
+            minmax(280px, 1fr));
+
+    gap: 16px;
+}
+
+.comparison-card {
+    padding: 24px;
+}
+
+.comparison-title {
+    margin-bottom: 18px;
+
+    font-size: 17px;
+    font-weight: 700;
+
+    line-height: 1.5;
+}
+
+.comparison-table {
+    border-top:
+        1px solid #eeeeee;
+}
+
+.comparison-row {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    gap: 20px;
+
+    padding: 14px 0;
+
+    border-bottom:
+        1px solid #eeeeee;
+}
+
+.comparison-name {
+    min-width: 0;
+
+    font-size: 15px;
+
+    color: #555;
+
+    overflow-wrap: anywhere;
+}
+
+.comparison-value {
+    flex-shrink: 0;
+
+    font-size: 17px;
+    font-weight: 700;
+
+    font-variant-numeric:
+        tabular-nums;
+}
+
+.comparison-unit {
+    margin-left: 5px;
+
+    font-size: 13px;
+    font-weight: 500;
+
+    color: #888;
+}
+
+
+/* ---------- 图表 ---------- */
+
+.chart-list {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 18px;
+}
+
+.chart-card {
+    padding:
+        24px 24px 20px;
+}
+
+.chart-header {
+    display: flex;
+
+    align-items: flex-start;
+
+    justify-content: space-between;
+
+    gap: 18px;
+
+    margin-bottom: 18px;
+}
+
+.chart-title {
+    font-size: 17px;
+    font-weight: 700;
+
+    line-height: 1.5;
+}
+
+.chart-unit {
+    margin-top: 6px;
+
+    font-size: 13px;
+
+    color: #888;
+}
+
+.chart-type {
+    flex-shrink: 0;
+
+    padding:
+        6px 9px;
+
+    border:
+        1px solid #e8e8e8;
+
+    border-radius: 999px;
+
+    font-size: 12px;
+
+    color: #777;
+}
+
+.chart-canvas-wrap {
+    width: 100%;
+    overflow: hidden;
+}
+
+.chart-canvas-wrap canvas {
+    display: block;
+
+    width: 100%;
+}
+
+
+/* ---------- 限制 ---------- */
+
+.limitation-card {
+    display: flex;
+
+    align-items: flex-start;
+
+    gap: 14px;
+
+    padding: 23px 24px;
+}
+
+.limitation-mark {
+    flex-shrink: 0;
+
+    width: 28px;
+    height: 28px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border:
+        1px solid #ddd;
+
+    border-radius: 50%;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    color: #555;
+}
+
+.limitation-text {
+    font-size: 15px;
+
+    line-height: 1.9;
+
+    color: #666;
+}
+
+
+/* ---------- 来源 ---------- */
+
+.source-card {
+    padding:
+        8px 24px;
+}
+
+.source-row {
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    padding: 15px 0;
+
+    border-bottom:
+        1px solid #eeeeee;
+}
+
+.source-row:last-child {
+    border-bottom: none;
+}
+
+.source-dot {
+    flex-shrink: 0;
+
+    width: 6px;
+    height: 6px;
+
+    border-radius: 50%;
+
+    background: #222;
+}
+
+.source-name {
+    font-size: 14px;
+
+    line-height: 1.7;
+
+    color: #555;
+
+    overflow-wrap: anywhere;
+}
+
+
+/* ---------- 最终结论 ---------- */
+
+.conclusion-card {
+    padding:
+        28px 30px;
+}
+
+.conclusion-text {
+    font-size: 18px;
+    font-weight: 600;
+
+    line-height: 1.9;
+}
+
+
+/* ---------- 错误 ---------- */
+
+.error-card {
+    padding: 30px;
+}
+
+.error-title {
+    margin-bottom: 10px;
+
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.error-text {
+    font-size: 15px;
+
+    line-height: 1.9;
+
+    color: #666;
+}
+
+
+/* ---------- 底部 ---------- */
+
+.detail-footer {
+    display: flex;
+
+    justify-content: center;
+
+    margin-top: 58px;
+}
+
+.secondary-button {
+    min-width: 110px;
+
+    border:
+        1px solid #dddddd;
+
+    background: #ffffff;
+
+    color: #222;
+
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.secondary-button:hover {
+    background: #f7f7f7;
+
+    border-color: #cccccc;
+}
+
+
+/* ==================================================
+   iPad / 手机
+================================================== */
+
+@media (max-width: 700px) {
+
+    .why-page {
+        margin: 90px auto;
+    }
+
+    .explain-page {
+        margin: 46px auto;
+    }
+
+
+    .detail-page {
+        width: min(calc(100% - 24px),
+                900px);
+
+        padding:
+            34px 0 52px;
+    }
+
+
+    .detail-header {
+        margin-bottom: 32px;
+    }
+
+
+    .detail-header h1 {
+        font-size: 30px;
+    }
+
+
+    .summary-card {
+        padding:
+            24px 22px 24px;
+    }
+
+
+    .summary-text {
+        font-size: 18px;
+    }
+
+
+    .detail-block {
+        margin-top: 38px;
+    }
+
+
+    .block-title {
+        font-size: 20px;
+    }
+
+
+    .explanation-card {
+        grid-template-columns:
+            36px minmax(0, 1fr);
+
+        padding:
+            21px 18px;
+    }
+
+
+    .section-body h2 {
+        font-size: 18px;
+    }
+
+
+    .section-body p {
+        font-size: 15px;
+    }
+
+
+    .comparison-list {
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .comparison-card {
+        padding:
+            21px 18px;
+    }
+
+
+    .chart-card {
+        padding:
+            20px 14px 16px;
+    }
+
+
+    .chart-header {
+        gap: 10px;
+    }
+
+
+    .chart-title {
+        font-size: 16px;
+    }
+
+
+    .conclusion-card {
+        padding:
+            24px 22px;
+    }
+
+
+    .conclusion-text {
+        font-size: 17px;
+    }
+
+}
+
+
+/* ==================================================
+   很窄的手机
+================================================== */
+
+@media (max-width: 420px) {
+
+    .detail-page {
+        width:
+            calc(100% - 20px);
+
+        padding-top: 26px;
+    }
+
+
+    .detail-header h1 {
+        font-size: 27px;
+    }
+
+
+    .summary-text {
+        font-size: 17px;
+    }
+
+
+    .comparison-row {
+        gap: 12px;
+    }
+
+
+    .comparison-value {
+        font-size: 16px;
+    }
+
 }

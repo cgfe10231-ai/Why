@@ -2,45 +2,38 @@
 <html lang="zh-CN">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>详细解释</title>
-
     <link rel="stylesheet" href="style.css">
-
 </head>
-
 
 <body>
 
     <main class="detail-page">
 
-        <h1 id="detailQuestion">
-            加载中……
-        </h1>
-
+        <div class="detail-header">
+            <div class="detail-eyebrow">深入解释</div>
+            <h1 id="detailQuestion">加载中……</h1>
+            <div class="detail-header-line"></div>
+        </div>
 
         <div id="detailContent">
 
-            <div class="loading">
-                详细解释生成中……
+            <div class="detail-loading-card">
+                <div class="loading-spinner"></div>
+                <div class="loading">详细解释生成中……</div>
             </div>
 
         </div>
 
-
-        <button id="detailBackButton">
-            返回
-        </button>
+        <div class="detail-footer">
+            <button id="detailBackButton" class="secondary-button">
+                返回
+            </button>
+        </div>
 
     </main>
-
 
     <script src="detail.js"></script>
 
