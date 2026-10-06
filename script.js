@@ -3,19 +3,21 @@ const question = document.getElementById("question");
 
 button.addEventListener("click", async () => {
 
-    // 生成中
     button.disabled = true;
     button.textContent = "生成中……";
     question.textContent = "";
 
     try {
 
-        const response = await fetch("/api/why", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
+        const response = await fetch(
+            "https://why-api.cgfe10231.workers.dev/",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                }
             }
-        });
+        );
 
         if (!response.ok) {
             throw new Error("服务器返回错误");
@@ -29,7 +31,6 @@ button.addEventListener("click", async () => {
 
         const selectedQuestion = data.question;
 
-        // 成功
         question.textContent = selectedQuestion;
 
         question.onclick = () => {
@@ -42,13 +43,11 @@ button.addEventListener("click", async () => {
 
         console.error(error);
 
-        // 失败
         question.textContent =
             "生成失败，请再试一次。";
 
     } finally {
 
-        // 回到待机状态
         button.disabled = false;
         button.textContent = "摇一个为什么";
     }
