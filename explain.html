@@ -35,6 +35,10 @@
         </div>
 
 
+        <button id="detailButton">
+            详细解释
+        </button>
+
         <button id="backButton">
             返回
         </button>
@@ -59,6 +63,11 @@
         const backButton =
             document.getElementById(
                 "backButton"
+            );
+
+        const detailButton =
+            document.getElementById(
+                "detailButton"
             );
 
 
@@ -258,14 +267,18 @@
 
 
 
-        backButton.addEventListener(
-            "click",
-            () => {
+        detailButton.addEventListener(
+    "click",
+    () => {
 
-                window.history.back();
+        window.location.href =
+            "detail.html?question=" +
+            encodeURIComponent(
+                question
+            );
 
-            }
-        );
+    }
+);
 
     </script>
 
