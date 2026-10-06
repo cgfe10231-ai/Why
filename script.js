@@ -34,4 +34,4 @@ button.addEventListener("click", () => {
             "explain.html?question=" +
             encodeURIComponent(selected.question);
     };
-}); 
+});
