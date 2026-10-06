@@ -3,1651 +3,1398 @@ const API_BASE =
 
 
 const detailQuestion =
-    document.getElementById(
-        "detailQuestion"
-    );
+    document.getElementById("detailQuestion");
 
 const detailContent =
-    document.getElementById(
-        "detailContent"
-    );
+    document.getElementById("detailContent");
 
 const detailBackButton =
-    document.getElementById(
-        "detailBackButton"
-    );
-
-
-const question =
-    sessionStorage.getItem(
-        "whyQuestion"
-    );
+    document.getElementById("detailBackButton");
 
 
 /*
-   当前已经走过的内容。
+ * =========================
+ * 当前问题
+ * =========================
+ *
+ * 第一优先级：
+ * detail.html?question=xxxx
+ *
+ * 第二优先级：
+ * sessionStorage
+ */
 
-   stack[0] = 根详细页
-   stack[1] = 点击的第一张卡
-   stack[2] = 第二张卡
-   ...
-*/
+function getRootQuestion() {
 
-const pageStack = [];
+    const params =
+        new URLSearchParams(
+            window.location.search
+        );
+
+    const urlQuestion =
+        params.get("question");
+
+    if (urlQuestion) {
+
+        sessionStorage.setItem(
+            "whyQuestion",
+            urlQuestion
+        );
+
+        return urlQuestion;
+    }
+
+
+    const savedQuestion =
+        sessionStorage.getItem(
+            "whyQuestion"
+        );
+
+    return savedQuestion || "";
+}
+
+
+const rootQuestion =
+    getRootQuestion();
 
 
 /*
-   已经请求过的节点缓存。
+ * 没有问题就不能继续。
+ */
 
-   同一个节点再次进入时，
-   不重新请求 AI。
-*/
+if (!rootQuestion) {
 
-const nodeCache =
-    new Map();
+    detailQuestion.textContent =
+        "没有找到问题";
 
+    detailContent.textContent =
+        "无法打开详细解释：没有找到当前问题。";
 
-/* ==================================================
-   HTML 安全
-================================================== */
+    detailBackButton.onclick =
+        () => {
 
-function escapeHTML(value) {
+            window.location.href =
+                "index.html";
+        };
 
-    return String(
-        value ?? ""
-    )
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-        .replace(
-            /</g,
-            "&lt;"
-        )
-        .replace(
-            />/g,
-            "&gt;"
-        )
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-        .replace(
-            /'/g,
-            "&#039;"
-        );
-}
+} else {
 
+    /*
+     * =========================
+     * 页面栈
+     * =========================
+     *
+     * 第 0 层永远是根详细页。
+     *
+     * 例如：
+     *
+     * Root
+     *   ↓
+     * 节点 A
+     *   ↓
+     * 节点 A-1
+     *
+     * pageStack：
+     *
+     * [
+     *   Root,
+     *   Node A,
+     *   Node A-1
+     * ]
+     */
 
-function formatText(value) {
-
-    return escapeHTML(
-        value
-    ).replace(
-        /\n/g,
-        "<br>"
-    );
-}
-
-
-/* ==================================================
-   API
-================================================== */
-
-async function postJSON(
-    path,
-    body
-) {
-
-    const response =
-        await fetch(
-            `${API_BASE}${path}`,
-            {
-                method: "POST",
-
-                headers: {
-                    "Content-Type":
-                        "application/json"
-                },
-
-                body:
-                    JSON.stringify(
-                        body
-                    )
-            }
-        );
+    const pageStack = [
+        {
+            type: "root",
+            key: "root",
+            data: null
+        }
+    ];
 
 
-    const text =
-        await response.text();
+    /*
+     * 已经生成过的节点放这里。
+     *
+     * 再次点击同一个节点：
+     * 直接读取缓存，
+     * 不重新请求 AI。
+     */
+
+    const nodeCache =
+        new Map();
 
 
-    let data;
+    /*
+     * =========================
+     * HTML 安全处理
+     * =========================
+     */
+
+    function escapeHtml(value) {
+
+        if (
+            value === null ||
+            value === undefined
+        ) {
+
+            return "";
+        }
 
 
-    try {
-
-        data =
-            JSON.parse(
-                text
-            );
-
-    } catch (error) {
-
-        throw new Error(
-            `服务器返回的不是 JSON：${text}`
-        );
+        return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
     }
 
 
-    if (
-        !response.ok
-    ) {
+    function text(value) {
 
-        throw new Error(
-            data.error ||
-            `请求失败：${response.status}`
-        );
-    }
+        if (
+            value === null ||
+            value === undefined
+        ) {
 
+            return "";
+        }
 
-    return data;
-}
-
-
-/* ==================================================
-   Loading
-================================================== */
-
-function showLoading(
-    text = "正在展开……"
-) {
-
-    detailContent.innerHTML = `
-        <section class="detail-card">
-            <h2>${escapeHTML(text)}</h2>
-        </section>
-    `;
-}
-
-
-/* ==================================================
-   根详细页
-================================================== */
-
-function normalizeRootDetail(
-    detail
-) {
-
-    const result =
-        detail || {};
-
-
-    if (
-        !Array.isArray(
-            result.sections
-        )
-    ) {
-
-        result.sections = [];
+        return escapeHtml(value);
     }
 
 
     /*
-       兼容旧版 Worker 返回的 deepDive
-    */
+     * =========================
+     * 通用区块
+     * =========================
+     */
 
-    if (
-        result.sections.length === 0 &&
-        Array.isArray(
-            result.deepDive
-        )
-    ) {
+    function renderTitle(title) {
 
-        result.sections =
-            result.deepDive.map(
-                (item, index) => ({
-                    id:
-                        `s${index + 1}`,
-
-                    title:
-                        item.title ||
-                        `继续追问 ${index + 1}`,
-
-                    summary:
-                        item.content ||
-                        ""
-                })
-            );
-    }
-
-
-    if (
-        !Array.isArray(
-            result.comparisons
-        )
-    ) {
-
-        result.comparisons = [];
-    }
-
-
-    if (
-        !Array.isArray(
-            result.charts
-        )
-    ) {
-
-        result.charts = [];
-    }
-
-
-    if (
-        !Array.isArray(
-            result.verificationPoints
-        )
-    ) {
-
-        result.verificationPoints = [];
-    }
-
-
-    if (
-        !Array.isArray(
-            result.sources
-        )
-    ) {
-
-        result.sources = [];
-    }
-
-
-    return result;
-}
-
-
-/* ==================================================
-   根详细页渲染
-================================================== */
-
-function renderRoot(
-    detail
-) {
-
-    detailQuestion.textContent =
-        question;
-
-
-    let html = "";
-
-
-    /* ------------------------------
-       Summary
-    ------------------------------ */
-
-    if (
-        detail.summary
-    ) {
-
-        html += `
-            <section class="summary-card">
-                <h2>先建立整体模型</h2>
-                <div>
-                    ${formatText(
-                        detail.summary
-                    )}
-                </div>
-            </section>
+        return `
+            <h2>
+                ${text(title)}
+            </h2>
         `;
     }
 
 
-    /* ------------------------------
-       可继续深入的卡片
-    ------------------------------ */
+    function renderParagraph(value) {
 
-    if (
-        detail.sections.length > 0
-    ) {
+        if (!value) {
 
-        html += `
-            <section class="detail-card">
-                <h2>继续展开</h2>
-
-                <div class="detail-sections">
-        `;
+            return "";
+        }
 
 
-        detail.sections.forEach(
-            (section, index) => {
-
-                const id =
-                    section.id ||
-                    `s${index + 1}`;
-
-
-                html += `
-                    <article
-                        class="detail-card expandable-card"
-                        data-node-id="${escapeHTML(id)}"
-                        data-node-title="${escapeHTML(
-                            section.title ||
-                            ""
-                        )}"
-                        data-node-summary="${escapeHTML(
-                            section.summary ||
-                            ""
-                        )}"
-                        tabindex="0"
-                        role="button"
-                    >
-
-                        <h3>
-                            ${escapeHTML(
-                                section.title ||
-                                "继续追问"
-                            )}
-                        </h3>
-
-                        <p>
-                            ${formatText(
-                                section.summary ||
-                                ""
-                            )}
-                        </p>
-
-                        <div>
-                            继续展开 →
-                        </div>
-
-                    </article>
-                `;
-            }
-        );
-
-
-        html += `
-                </div>
-            </section>
+        return `
+            <p>
+                ${text(value)}
+            </p>
         `;
     }
 
 
-    /* ------------------------------
-       Comparisons
-    ------------------------------ */
+    /*
+     * =========================
+     * 比较
+     * =========================
+     */
 
-    html +=
-        renderComparisons(
-            detail.comparisons
-        );
-
-
-    /* ------------------------------
-       Charts
-    ------------------------------ */
-
-    html +=
-        renderCharts(
-            detail.charts
-        );
-
-
-    /* ------------------------------
-       Verification
-    ------------------------------ */
-
-    html +=
-        renderVerification(
-            detail.verificationPoints
-        );
-
-
-    /* ------------------------------
-       Limitations
-    ------------------------------ */
-
-    if (
-        detail.limitations
+    function renderComparisons(
+        comparisons
     ) {
 
-        html += `
-            <section class="limitation-card">
+        if (
+            !Array.isArray(comparisons) ||
+            comparisons.length === 0
+        ) {
 
-                <h2>解释的边界</h2>
-
-                <div>
-                    ${formatText(
-                        detail.limitations
-                    )}
-                </div>
-
-            </section>
-        `;
-    }
+            return "";
+        }
 
 
-    /* ------------------------------
-       Sources
-    ------------------------------ */
-
-    html +=
-        renderSources(
-            detail.sources
-        );
-
-
-    /* ------------------------------
-       Conclusion
-    ------------------------------ */
-
-    if (
-        detail.conclusion
-    ) {
-
-        html += `
-            <section class="conclusion-card">
-
-                <h2>收束</h2>
-
-                <div>
-                    ${formatText(
-                        detail.conclusion
-                    )}
-                </div>
-
-            </section>
-        `;
-    }
-
-
-    detailContent.innerHTML =
-        html;
-
-
-    drawAllCharts();
-}
-
-
-/* ==================================================
-   深入节点渲染
-================================================== */
-
-function renderNode(
-    node
-) {
-
-    detailQuestion.textContent =
-        node.title ||
-        "继续展开";
-
-
-    let html = "";
-
-
-    /* ------------------------------
-       Summary
-    ------------------------------ */
-
-    if (
-        node.summary
-    ) {
-
-        html += `
-            <section class="summary-card">
-
-                <h2>这一层要解决什么</h2>
-
-                <div>
-                    ${formatText(
-                        node.summary
-                    )}
-                </div>
-
-            </section>
-        `;
-    }
-
-
-    /* ------------------------------
-       严密推导
-    ------------------------------ */
-
-    if (
-        node.steps.length > 0
-    ) {
-
-        node.steps.forEach(
-            (step, index) => {
-
-                html += `
-                    <section class="detail-card">
-
-                        <h2>
-                            ${escapeHTML(
-                                step.title ||
-                                `推导步骤 ${index + 1}`
-                            )}
-                        </h2>
-
-                        <div>
-                            ${formatText(
-                                step.content ||
-                                ""
-                            )}
-                        </div>
-
-                    </section>
-                `;
-            }
-        );
-    }
-
-
-    /* ------------------------------
-       更深的问题
-    ------------------------------ */
-
-    if (
-        node.children.length > 0
-    ) {
-
-        html += `
-            <section class="detail-card">
-
-                <h2>继续往下追问</h2>
-
-                <div class="detail-sections">
+        let html = `
+            <section>
+                <h2>比较</h2>
         `;
 
 
-        node.children.forEach(
-            (child, index) => {
-
-                const id =
-                    child.id ||
-                    `c${index + 1}`;
-
-
-                html += `
-                    <article
-                        class="detail-card expandable-card"
-                        data-node-id="${escapeHTML(id)}"
-                        data-node-title="${escapeHTML(
-                            child.title ||
-                            ""
-                        )}"
-                        data-node-summary="${escapeHTML(
-                            child.summary ||
-                            ""
-                        )}"
-                        tabindex="0"
-                        role="button"
-                    >
-
-                        <h3>
-                            ${escapeHTML(
-                                child.title ||
-                                "继续追问"
-                            )}
-                        </h3>
-
-                        <p>
-                            ${formatText(
-                                child.summary ||
-                                ""
-                            )}
-                        </p>
-
-                        <div>
-                            继续展开 →
-                        </div>
-
-                    </article>
-                `;
-            }
-        );
-
-
-        html += `
-                </div>
-
-            </section>
-        `;
-    }
-
-
-    /* ------------------------------
-       Verification
-    ------------------------------ */
-
-    html +=
-        renderVerification(
-            node.verification
-        );
-
-
-    /* ------------------------------
-       Comparisons
-    ------------------------------ */
-
-    html +=
-        renderComparisons(
-            node.comparisons
-        );
-
-
-    /* ------------------------------
-       Charts
-    ------------------------------ */
-
-    html +=
-        renderCharts(
-            node.charts
-        );
-
-
-    /* ------------------------------
-       Limitations
-    ------------------------------ */
-
-    if (
-        node.limitations
-    ) {
-
-        html += `
-            <section class="limitation-card">
-
-                <h2>边界</h2>
-
-                <div>
-                    ${formatText(
-                        node.limitations
-                    )}
-                </div>
-
-            </section>
-        `;
-    }
-
-
-    /* ------------------------------
-       Sources
-    ------------------------------ */
-
-    html +=
-        renderSources(
-            node.sources
-        );
-
-
-    detailContent.innerHTML =
-        html;
-
-
-    drawAllCharts();
-}
-
-
-/* ==================================================
-   Comparisons
-================================================== */
-
-function renderComparisons(
-    comparisons
-) {
-
-    if (
-        !Array.isArray(
-            comparisons
-        ) ||
-        comparisons.length === 0
-    ) {
-
-        return "";
-    }
-
-
-    let html = "";
-
-
-    comparisons.forEach(
-        comparison => {
-
-            html += `
-                <section class="comparison-card">
-
-                    <h2>
-                        ${escapeHTML(
-                            comparison.title ||
-                            "比较"
-                        )}
-                    </h2>
-            `;
-
+        for (
+            const item of comparisons
+        ) {
 
             if (
-                Array.isArray(
-                    comparison.items
-                )
+                !item ||
+                typeof item !== "object"
             ) {
 
-                comparison.items.forEach(
-                    item => {
-
-                        html += `
-                            <div>
-                                <strong>
-                                    ${escapeHTML(
-                                        item.name ||
-                                        ""
-                                    )}
-                                </strong>
-
-                                <span>
-                                    ${escapeHTML(
-                                        item.value ??
-                                        ""
-                                    )}
-
-                                    ${escapeHTML(
-                                        item.unit ||
-                                        ""
-                                    )}
-                                </span>
-                            </div>
-                        `;
-                    }
-                );
+                continue;
             }
 
 
             html += `
-                </section>
-            `;
-        }
-    );
-
-
-    return html;
-}
-
-
-/* ==================================================
-   Verification
-================================================== */
-
-function renderVerification(
-    points
-) {
-
-    if (
-        !Array.isArray(points) ||
-        points.length === 0
-    ) {
-
-        return "";
-    }
-
-
-    let html = `
-        <section class="detail-card">
-
-            <h2>需要验证的地方</h2>
-    `;
-
-
-    points.forEach(
-        point => {
-
-            html += `
-                <article>
+                <div class="detail-card">
 
                     <h3>
-                        ${escapeHTML(
-                            point.claim ||
-                            ""
-                        )}
+                        ${text(item.title)}
                     </h3>
 
-                    <p>
-                        <strong>
-                            为什么：
-                        </strong>
+                    ${
+                        renderParagraph(
+                            item.description ||
+                            item.explanation
+                        )
+                    }
 
-                        ${formatText(
-                            point.why ||
-                            ""
-                        )}
-                    </p>
+                    ${
+                        renderParagraph(
+                            item.difference
+                        )
+                    }
 
-                    <p>
-                        <strong>
-                            证据类型：
-                        </strong>
-
-                        ${formatText(
-                            point.evidenceType ||
-                            ""
-                        )}
-                    </p>
-
-                </article>
+                </div>
             `;
         }
-    );
 
 
-    html += `
-        </section>
-    `;
+        html += `
+            </section>
+        `;
 
 
-    return html;
-}
-
-
-/* ==================================================
-   Sources
-================================================== */
-
-function renderSources(
-    sources
-) {
-
-    if (
-        !Array.isArray(sources) ||
-        sources.length === 0
-    ) {
-
-        return "";
+        return html;
     }
 
 
-    let html = `
-        <section class="source-card">
+    /*
+     * =========================
+     * 验证
+     * =========================
+     */
 
-            <h2>来源</h2>
+    function renderVerification(
+        verification
+    ) {
 
-            <div>
-    `;
+        if (
+            !Array.isArray(verification) ||
+            verification.length === 0
+        ) {
+
+            return "";
+        }
 
 
-    sources.forEach(
-        source => {
+        let html = `
+            <section>
+                <h2>验证</h2>
+        `;
+
+
+        for (
+            const item of verification
+        ) {
 
             if (
-                source &&
-                source.name
+                typeof item === "string"
             ) {
 
                 html += `
-                    <p>
-                        ${escapeHTML(
-                            source.name
-                        )}
-                    </p>
+                    <div class="detail-card">
+                        ${text(item)}
+                    </div>
                 `;
+
+                continue;
             }
-        }
-    );
 
-
-    html += `
-            </div>
-
-        </section>
-    `;
-
-
-    return html;
-}
-
-
-/* ==================================================
-   Charts
-================================================== */
-
-function renderCharts(
-    charts
-) {
-
-    if (
-        !Array.isArray(charts) ||
-        charts.length === 0
-    ) {
-
-        return "";
-    }
-
-
-    let html = "";
-
-
-    charts.forEach(
-        (chart, index) => {
 
             if (
-                !Array.isArray(
-                    chart.labels
-                ) ||
-                !Array.isArray(
-                    chart.values
-                )
+                !item ||
+                typeof item !== "object"
             ) {
 
-                return;
+                continue;
             }
-
-
-            const canvasId =
-                `chart-${Date.now()}-${index}`;
 
 
             html += `
-                <section
-                    class="chart-card"
-                >
+                <div class="detail-card">
 
-                    <h2>
-                        ${escapeHTML(
-                            chart.title ||
-                            "图表"
-                        )}
-                    </h2>
+                    <h3>
+                        ${text(item.claim)}
+                    </h3>
 
-                    <canvas
-                        id="${canvasId}"
-                        class="detail-chart"
-                        data-labels='${JSON.stringify(
-                            chart.labels
-                        )}'
-                        data-values='${JSON.stringify(
-                            chart.values
-                        )}'
-                        data-unit="${escapeHTML(
-                            chart.unit ||
-                            ""
-                        )}"
-                    ></canvas>
+                    ${
+                        renderParagraph(
+                            item.method
+                        )
+                    }
+
+                    ${
+                        renderParagraph(
+                            item.evidence
+                        )
+                    }
+
+                    ${
+                        renderParagraph(
+                            item.note
+                        )
+                    }
+
+                </div>
+            `;
+        }
+
+
+        html += `
+            </section>
+        `;
+
+
+        return html;
+    }
+
+
+    /*
+     * =========================
+     * 图表
+     * =========================
+     *
+     * 目前这里只负责显示 AI 返回的
+     * 图表说明。
+     *
+     * 后面接真实数据时再做真正图表。
+     */
+
+    function renderCharts(charts) {
+
+        if (
+            !Array.isArray(charts) ||
+            charts.length === 0
+        ) {
+
+            return "";
+        }
+
+
+        let html = `
+            <section>
+                <h2>数据与图表</h2>
+        `;
+
+
+        for (
+            const chart of charts
+        ) {
+
+            if (
+                !chart ||
+                typeof chart !== "object"
+            ) {
+
+                continue;
+            }
+
+
+            html += `
+                <div class="detail-card">
+
+                    <h3>
+                        ${text(chart.title)}
+                    </h3>
+
+                    ${
+                        renderParagraph(
+                            chart.description
+                        )
+                    }
+
+                    ${
+                        renderParagraph(
+                            chart.dataMeaning
+                        )
+                    }
+
+                </div>
+            `;
+        }
+
+
+        html += `
+            </section>
+        `;
+
+
+        return html;
+    }
+
+
+    /*
+     * =========================
+     * 来源
+     * =========================
+     */
+
+    function renderSources(sources) {
+
+        if (
+            !Array.isArray(sources) ||
+            sources.length === 0
+        ) {
+
+            return "";
+        }
+
+
+        let html = `
+            <section>
+                <h2>资料来源</h2>
+        `;
+
+
+        for (
+            const source of sources
+        ) {
+
+            if (
+                typeof source === "string"
+            ) {
+
+                html += `
+                    <div class="detail-card">
+                        ${text(source)}
+                    </div>
+                `;
+
+                continue;
+            }
+
+
+            if (
+                !source ||
+                typeof source !== "object"
+            ) {
+
+                continue;
+            }
+
+
+            html += `
+                <div class="detail-card">
+
+                    <h3>
+                        ${text(source.title)}
+                    </h3>
+
+                    ${
+                        renderParagraph(
+                            source.description
+                        )
+                    }
+
+                    ${
+                        renderParagraph(
+                            source.url
+                        )
+                    }
+
+                </div>
+            `;
+        }
+
+
+        html += `
+            </section>
+        `;
+
+
+        return html;
+    }
+
+
+    /*
+     * =========================
+     * 根详细页
+     * =========================
+     */
+
+    function renderRoot(data) {
+
+        if (!data) {
+
+            detailContent.textContent =
+                "详细解释为空。";
+
+            return;
+        }
+
+
+        let html = "";
+
+
+        /*
+         * 总结
+         */
+
+        if (data.summary) {
+
+            html += `
+                <section>
+
+                    <h2>核心机制</h2>
+
+                    <p>
+                        ${text(data.summary)}
+                    </p>
 
                 </section>
             `;
         }
-    );
 
 
-    return html;
-}
+        /*
+         * 关键讨论节点
+         *
+         * 每一个卡片都可以继续展开。
+         */
+
+        if (
+            Array.isArray(data.sections) &&
+            data.sections.length > 0
+        ) {
+
+            html += `
+                <section>
+
+                    <h2>展开讨论</h2>
+
+                    <div
+                        id="rootNodeList"
+                    >
+            `;
 
 
-/* ==================================================
-   Canvas
-================================================== */
-
-function drawAllCharts() {
-
-    const canvases =
-        detailContent.querySelectorAll(
-            "canvas.detail-chart"
-        );
-
-
-    canvases.forEach(
-        canvas => {
-
-            let labels = [];
-            let values = [];
-
-
-            try {
-
-                labels =
-                    JSON.parse(
-                        canvas.dataset.labels
-                    );
-
-                values =
-                    JSON.parse(
-                        canvas.dataset.values
-                    );
-
-            } catch (error) {
-
-                return;
-            }
-
-
-            const unit =
-                canvas.dataset.unit ||
-                "";
-
-
-            const ctx =
-                canvas.getContext(
-                    "2d"
-                );
-
-
-            const width =
-                canvas.clientWidth ||
-                700;
-
-            const height =
-                280;
-
-
-            canvas.width =
-                width *
-                window.devicePixelRatio;
-
-            canvas.height =
-                height *
-                window.devicePixelRatio;
-
-
-            ctx.scale(
-                window.devicePixelRatio,
-                window.devicePixelRatio
-            );
-
-
-            ctx.clearRect(
-                0,
-                0,
-                width,
-                height
-            );
-
-
-            if (
-                values.length === 0
+            for (
+                const section of data.sections
             ) {
 
-                return;
+                if (
+                    !section ||
+                    !section.id
+                ) {
+
+                    continue;
+                }
+
+
+                html += `
+                    <button
+                        type="button"
+                        class="detail-card detail-node-card"
+                        data-node-id="${text(section.id)}"
+                    >
+
+                        <strong>
+                            ${text(section.title)}
+                        </strong>
+
+                        ${
+                            section.summary
+                                ? `<span>
+                                      ${text(
+                                          section.summary
+                                      )}
+                                   </span>`
+                                : ""
+                        }
+
+                    </button>
+                `;
             }
 
 
-            const maxValue =
-                Math.max(
-                    ...values.map(
-                        value =>
-                            Number(
-                                value
-                            ) || 0
-                    )
-                );
+            html += `
+                    </div>
+
+                </section>
+            `;
+        }
 
 
-            if (
-                maxValue <= 0
-            ) {
-
-                return;
-            }
-
-
-            const left =
-                50;
-
-            const right =
-                20;
-
-            const top =
-                20;
-
-            const bottom =
-                50;
-
-
-            const chartWidth =
-                width -
-                left -
-                right;
-
-            const chartHeight =
-                height -
-                top -
-                bottom;
-
-
-            ctx.beginPath();
-
-            ctx.moveTo(
-                left,
-                top
+        html +=
+            renderComparisons(
+                data.comparisons
             );
 
-            ctx.lineTo(
-                left,
-                height - bottom
+
+        html +=
+            renderCharts(
+                data.charts
             );
 
-            ctx.lineTo(
-                width - right,
-                height - bottom
+
+        html +=
+            renderVerification(
+                data.verificationPoints
             );
 
-            ctx.stroke();
+
+        if (data.limitations) {
+
+            html += `
+                <section>
+
+                    <h2>边界与限制</h2>
+
+                    <p>
+                        ${text(
+                            data.limitations
+                        )}
+                    </p>
+
+                </section>
+            `;
+        }
 
 
-            const barWidth =
-                chartWidth /
-                values.length *
-                0.6;
+        html +=
+            renderSources(
+                data.sources
+            );
 
 
-            values.forEach(
-                (value, index) => {
+        if (data.conclusion) {
 
-                    const number =
-                        Number(
-                            value
-                        ) || 0;
+            html += `
+                <section>
 
+                    <h2>结论</h2>
 
-                    const barHeight =
-                        number /
-                        maxValue *
-                        chartHeight;
+                    <p>
+                        ${text(
+                            data.conclusion
+                        )}
+                    </p>
 
-
-                    const x =
-                        left +
-                        (
-                            index + 0.5
-                        ) *
-                        (
-                            chartWidth /
-                            values.length
-                        ) -
-                        barWidth / 2;
+                </section>
+            `;
+        }
 
 
-                    const y =
-                        height -
-                        bottom -
-                        barHeight;
+        detailContent.innerHTML =
+            html;
 
 
-                    ctx.fillRect(
-                        x,
-                        y,
-                        barWidth,
-                        barHeight
-                    );
+        /*
+         * 根节点按钮统一走事件代理。
+         */
+
+        const rootNodeList =
+            document.getElementById(
+                "rootNodeList"
+            );
 
 
-                    ctx.fillText(
-                        String(
-                            labels[index] ??
-                            ""
-                        ),
-                        x,
-                        height -
-                        bottom +
-                        20
-                    );
+        if (rootNodeList) {
+
+            rootNodeList.addEventListener(
+                "click",
+                event => {
+
+                    const card =
+                        event.target.closest(
+                            "[data-node-id]"
+                        );
+
+                    if (!card) {
+                        return;
+                    }
 
 
-                    ctx.fillText(
-                        `${number}${unit}`,
-                        x,
-                        y - 8
-                    );
+                    const id =
+                        card.dataset.nodeId;
+
+
+                    const section =
+                        data.sections.find(
+                            item =>
+                                item.id === id
+                        );
+
+
+                    if (!section) {
+                        return;
+                    }
+
+
+                    openNode({
+                        id:
+                            section.id,
+
+                        title:
+                            section.title,
+
+                        summary:
+                            section.summary
+                    });
                 }
             );
         }
-    );
-}
-
-
-/* ==================================================
-   点击卡片
-================================================== */
-
-async function openNode(
-    nodeId,
-    nodeTitle,
-    nodeSummary
-) {
-
-    const currentPath =
-        pageStack.map(
-            item =>
-                item.title
-        );
-
-
-    const cacheKey =
-        [
-            ...currentPath,
-            nodeId
-        ].join(
-            " > "
-        );
-
-
-    /*
-       已经打开过：
-       直接恢复，不重新调用 AI。
-    */
-
-    if (
-        nodeCache.has(
-            cacheKey
-        )
-    ) {
-
-        const cached =
-            nodeCache.get(
-                cacheKey
-            );
-
-
-        pageStack.push(
-            {
-                type:
-                    "node",
-
-                title:
-                    cached.title,
-
-                data:
-                    cached
-            }
-        );
-
-
-        renderNode(
-            cached
-        );
-
-        return;
     }
 
 
-    showLoading(
-        "正在把这个问题继续展开……"
-    );
+    /*
+     * =========================
+     * 深入节点页
+     * =========================
+     */
+
+    function renderNode(data) {
+
+        if (!data) {
+
+            detailContent.textContent =
+                "详细解释为空。";
+
+            return;
+        }
 
 
-    try {
+        let html = "";
 
-        const response =
-            await postJSON(
-                "/api/detail-node",
-                {
-                    question:
-                        question,
 
-                    nodeTitle:
-                        nodeTitle,
+        /*
+         * 当前节点摘要
+         */
 
-                    nodeSummary:
-                        nodeSummary,
+        if (data.summary) {
 
-                    path:
-                        currentPath
+            html += `
+                <section>
+
+                    <h2>当前问题</h2>
+
+                    <p>
+                        ${text(data.summary)}
+                    </p>
+
+                </section>
+            `;
+        }
+
+
+        /*
+         * 因果 / 推导步骤
+         */
+
+        if (
+            Array.isArray(data.steps) &&
+            data.steps.length > 0
+        ) {
+
+            html += `
+                <section>
+
+                    <h2>推导过程</h2>
+            `;
+
+
+            for (
+                let i = 0;
+                i < data.steps.length;
+                i++
+            ) {
+
+                const step =
+                    data.steps[i];
+
+
+                if (
+                    typeof step === "string"
+                ) {
+
+                    html += `
+                        <div class="detail-card">
+
+                            <strong>
+                                第 ${i + 1} 步
+                            </strong>
+
+                            <p>
+                                ${text(step)}
+                            </p>
+
+                        </div>
+                    `;
+
+                    continue;
                 }
+
+
+                if (
+                    !step ||
+                    typeof step !== "object"
+                ) {
+
+                    continue;
+                }
+
+
+                html += `
+                    <div class="detail-card">
+
+                        <strong>
+                            ${text(
+                                step.title ||
+                                `第 ${i + 1} 步`
+                            )}
+                        </strong>
+
+                        ${
+                            renderParagraph(
+                                step.description
+                            )
+                        }
+
+                        ${
+                            renderParagraph(
+                                step.reason
+                            )
+                        }
+
+                        ${
+                            renderParagraph(
+                                step.condition
+                            )
+                        }
+
+                    </div>
+                `;
+            }
+
+
+            html += `
+                </section>
+            `;
+        }
+
+
+        /*
+         * 更深一层的问题
+         */
+
+        if (
+            Array.isArray(data.children) &&
+            data.children.length > 0
+        ) {
+
+            html += `
+                <section>
+
+                    <h2>继续展开</h2>
+
+                    <div
+                        id="childNodeList"
+                    >
+            `;
+
+
+            for (
+                const child of data.children
+            ) {
+
+                if (
+                    !child ||
+                    !child.id
+                ) {
+
+                    continue;
+                }
+
+
+                html += `
+                    <button
+                        type="button"
+                        class="detail-card detail-node-card"
+                        data-node-id="${text(child.id)}"
+                    >
+
+                        <strong>
+                            ${text(
+                                child.title
+                            )}
+                        </strong>
+
+                        ${
+                            child.summary
+                                ? `<span>
+                                      ${text(
+                                          child.summary
+                                      )}
+                                   </span>`
+                                : ""
+                        }
+
+                    </button>
+                `;
+            }
+
+
+            html += `
+                    </div>
+
+                </section>
+            `;
+        }
+
+
+        html +=
+            renderVerification(
+                data.verification
             );
 
 
-        const node =
-            response.node;
+        html +=
+            renderComparisons(
+                data.comparisons
+            );
 
 
-        node.title =
-            node.title ||
-            nodeTitle;
+        html +=
+            renderCharts(
+                data.charts
+            );
 
 
-        node.summary =
-            node.summary ||
-            nodeSummary;
+        if (data.limitations) {
 
+            html += `
+                <section>
 
-        if (
-            !Array.isArray(
-                node.steps
-            )
-        ) {
+                    <h2>边界与限制</h2>
 
-            node.steps = [];
+                    <p>
+                        ${text(
+                            data.limitations
+                        )}
+                    </p>
+
+                </section>
+            `;
         }
 
 
+        html +=
+            renderSources(
+                data.sources
+            );
+
+
+        detailContent.innerHTML =
+            html;
+
+
+        /*
+         * 子节点事件代理
+         */
+
+        const childNodeList =
+            document.getElementById(
+                "childNodeList"
+            );
+
+
+        if (childNodeList) {
+
+            childNodeList.addEventListener(
+                "click",
+                event => {
+
+                    const card =
+                        event.target.closest(
+                            "[data-node-id]"
+                        );
+
+
+                    if (!card) {
+                        return;
+                    }
+
+
+                    const id =
+                        card.dataset.nodeId;
+
+
+                    const child =
+                        data.children.find(
+                            item =>
+                                item.id === id
+                        );
+
+
+                    if (!child) {
+                        return;
+                    }
+
+
+                    openNode({
+                        id:
+                            child.id,
+
+                        title:
+                            child.title,
+
+                        summary:
+                            child.summary
+                    });
+                }
+            );
+        }
+    }
+
+
+    /*
+     * =========================
+     * 获取根详细解释
+     * =========================
+     */
+
+    async function loadRoot() {
+
+        detailQuestion.textContent =
+            rootQuestion;
+
+        detailContent.textContent =
+            "正在生成详细解释……";
+
+
+        try {
+
+            const response =
+                await fetch(
+                    API_BASE + "/api/detail",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+                            question:
+                                rootQuestion
+                        })
+                    }
+                );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    "详细解释生成失败"
+                );
+            }
+
+
+            const data =
+                await response.json();
+
+
+            if (!data.detail) {
+
+                throw new Error(
+                    "服务器没有返回详细解释"
+                );
+            }
+
+
+            /*
+             * 缓存根页
+             */
+
+            pageStack[0].data =
+                data.detail;
+
+
+            renderRoot(
+                data.detail
+            );
+
+        } catch (error) {
+
+            console.error(error);
+
+            detailContent.textContent =
+                "生成详细解释失败，请再试一次。";
+        }
+    }
+
+
+    /*
+     * =========================
+     * 获取一个更深节点
+     * =========================
+     */
+
+    async function openNode(node) {
+
+        /*
+         * 唯一缓存键：
+         *
+         * 父级路径 + 当前节点 id
+         *
+         * 这样不同父节点下即使出现
+         * 同名节点，也不会混在一起。
+         */
+
+        const path =
+            pageStack.map(
+                page =>
+                    page.title || "根详细解释"
+            );
+
+
+        const cacheKey =
+            path.join(" > ") +
+            "::" +
+            node.id;
+
+
+        /*
+         * 已经打开过：
+         * 直接恢复。
+         */
+
         if (
-            !Array.isArray(
-                node.children
-            )
+            nodeCache.has(cacheKey)
         ) {
 
-            node.children = [];
-        }
+            const cached =
+                nodeCache.get(
+                    cacheKey
+                );
 
 
-        if (
-            !Array.isArray(
-                node.verification
-            )
-        ) {
+            pageStack.push({
+                type: "node",
 
-            node.verification = [];
-        }
-
-
-        if (
-            !Array.isArray(
-                node.comparisons
-            )
-        ) {
-
-            node.comparisons = [];
-        }
-
-
-        if (
-            !Array.isArray(
-                node.charts
-            )
-        ) {
-
-            node.charts = [];
-        }
-
-
-        if (
-            !Array.isArray(
-                node.sources
-            )
-        ) {
-
-            node.sources = [];
-        }
-
-
-        nodeCache.set(
-            cacheKey,
-            node
-        );
-
-
-        pageStack.push(
-            {
-                type:
-                    "node",
+                key: cacheKey,
 
                 title:
                     node.title,
 
                 data:
-                    node
+                    cached
+            });
+
+
+            detailQuestion.textContent =
+                node.title;
+
+
+            renderNode(
+                cached
+            );
+
+            return;
+        }
+
+
+        /*
+         * 先进入“加载中”的节点页
+         */
+
+        detailQuestion.textContent =
+            node.title;
+
+
+        detailContent.textContent =
+            "正在展开这个问题……";
+
+
+        try {
+
+            const response =
+                await fetch(
+                    API_BASE +
+                    "/api/detail-node",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+
+                            question:
+                                rootQuestion,
+
+                            nodeTitle:
+                                node.title,
+
+                            nodeSummary:
+                                node.summary || "",
+
+                            path:
+                                path
+
+                        })
+                    }
+                );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    "节点解释生成失败"
+                );
             }
-        );
 
 
-        renderNode(
-            node
-        );
+            const result =
+                await response.json();
 
 
-    } catch (error) {
+            if (!result.node) {
 
-        console.error(
-            error
-        );
-
-
-        detailContent.innerHTML = `
-            <section class="detail-card">
-
-                <h2>
-                    展开失败
-                </h2>
-
-                <p>
-                    ${formatText(
-                        error.message
-                    )}
-                </p>
-
-            </section>
-        `;
-    }
-}
+                throw new Error(
+                    "服务器没有返回节点解释"
+                );
+            }
 
 
-/* ==================================================
-   点击事件统一处理
-================================================== */
+            /*
+             * 缓存
+             */
 
-detailContent.addEventListener(
-    "click",
-    event => {
-
-        const card =
-            event.target.closest(
-                "[data-node-id]"
+            nodeCache.set(
+                cacheKey,
+                result.node
             );
 
 
-        if (!card) {
-            return;
-        }
+            /*
+             * 压入自己的页面栈
+             */
 
+            pageStack.push({
 
-        openNode(
-            card.dataset.nodeId,
-            card.dataset.nodeTitle,
-            card.dataset.nodeSummary
-        );
-    }
-);
+                type: "node",
 
-
-/* ==================================================
-   键盘 / 辅助操作
-================================================== */
-
-detailContent.addEventListener(
-    "keydown",
-    event => {
-
-        if (
-            event.key !== "Enter" &&
-            event.key !== " "
-        ) {
-
-            return;
-        }
-
-
-        const card =
-            event.target.closest(
-                "[data-node-id]"
-            );
-
-
-        if (!card) {
-            return;
-        }
-
-
-        event.preventDefault();
-
-
-        openNode(
-            card.dataset.nodeId,
-            card.dataset.nodeTitle,
-            card.dataset.nodeSummary
-        );
-    }
-);
-
-
-/* ==================================================
-   返回
-================================================== */
-
-function goBack() {
-
-    /*
-       当前还在根详细页：
-       返回 explain.html
-    */
-
-    if (
-        pageStack.length <= 1
-    ) {
-
-        window.location.href =
-            "explain.html";
-
-        return;
-    }
-
-
-    /*
-       当前是深层节点：
-       删除当前节点，
-       恢复真正的上一级。
-    */
-
-    pageStack.pop();
-
-
-    const previous =
-        pageStack[
-            pageStack.length - 1
-        ];
-
-
-    if (
-        previous.type === "root"
-    ) {
-
-        detailQuestion.textContent =
-            question;
-
-        renderRoot(
-            previous.data
-        );
-
-    } else {
-
-        renderNode(
-            previous.data
-        );
-    }
-}
-
-
-detailBackButton.addEventListener(
-    "click",
-    goBack
-);
-
-
-/* ==================================================
-   初始加载
-================================================== */
-
-async function loadRoot() {
-
-    if (!question) {
-
-        detailQuestion.textContent =
-            "没有找到问题";
-
-        detailContent.innerHTML = `
-            <section class="detail-card">
-
-                <h2>
-                    无法打开详细解释
-                </h2>
-
-                <p>
-                    没有找到当前问题。
-                </p>
-
-            </section>
-        `;
-
-        return;
-    }
-
-
-    showLoading(
-        "正在建立详细解释……"
-    );
-
-
-    try {
-
-        const response =
-            await postJSON(
-                "/api/detail",
-                {
-                    question:
-                        question
-                }
-            );
-
-
-        const detail =
-            normalizeRootDetail(
-                response.detail
-            );
-
-
-        pageStack.length =
-            0;
-
-
-        pageStack.push(
-            {
-                type:
-                    "root",
+                key: cacheKey,
 
                 title:
-                    question,
+                    node.title,
 
                 data:
-                    detail
-            }
-        );
+                    result.node
+            });
 
 
-        renderRoot(
-            detail
-        );
+            renderNode(
+                result.node
+            );
 
 
-    } catch (error) {
+        } catch (error) {
 
-        console.error(
-            error
-        );
+            console.error(error);
 
-
-        detailContent.innerHTML = `
-            <section class="detail-card">
-
-                <h2>
-                    详细解释生成失败
-                </h2>
-
-                <p>
-                    ${formatText(
-                        error.message
-                    )}
-                </p>
-
-            </section>
-        `;
+            detailContent.textContent =
+                "这个深入问题生成失败，请再试一次。";
+        }
     }
+
+
+    /*
+     * =========================
+     * 返回
+     * =========================
+     *
+     * 这里彻底不用 history.back()
+     */
+
+    detailBackButton.onclick =
+        () => {
+
+            /*
+             * 当前是深入节点：
+             *
+             * Node A-1
+             *    ↓ 返回
+             * Node A
+             */
+
+            if (
+                pageStack.length > 1
+            ) {
+
+                pageStack.pop();
+
+
+                const previous =
+                    pageStack[
+                        pageStack.length - 1
+                    ];
+
+
+                if (
+                    previous.type === "root"
+                ) {
+
+                    detailQuestion.textContent =
+                        rootQuestion;
+
+
+                    renderRoot(
+                        previous.data
+                    );
+
+                } else {
+
+                    detailQuestion.textContent =
+                        previous.title;
+
+
+                    renderNode(
+                        previous.data
+                    );
+                }
+
+
+                return;
+            }
+
+
+            /*
+             * 当前已经是根详细页：
+             *
+             * Detail Root
+             *      ↓ 返回
+             * Explain
+             *
+             * 明确指定地址，
+             * 不让浏览器自己猜历史。
+             */
+
+            window.location.href =
+                "explain.html?question=" +
+                encodeURIComponent(
+                    rootQuestion
+                );
+        };
+
+
+    /*
+     * 启动根详细页
+     */
+
+    loadRoot();
 }
-
-
-loadRoot();

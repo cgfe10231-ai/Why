@@ -2,118 +2,131 @@
 <html lang="zh-CN">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>为什么</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>为什么 - 解释</title>
     <link rel="stylesheet" href="style.css">
-
 </head>
-
 
 <body>
 
-    <main class="explain-page">
+    <main class="why-page">
 
-        <h1 id="question">
-            加载中……
-        </h1>
+        <h1 id="explainQuestion">正在加载问题……</h1>
 
-
-        <div id="explanation">
-
-            <div class="loading">
-                解释生成中……
-            </div>
-
+        <div id="explainContent">
+            正在生成解释……
         </div>
-
 
         <button id="detailButton">
             详细解释
         </button>
 
-        <button id="backButton" onclick="history.back()">
+        <button id="backButton">
             返回
         </button>
 
     </main>
 
-
     <script>
+        const API_BASE =
+            "https://why-api.cgfe10231.workers.dev";
 
-        const questionElement =
-            document.getElementById(
-                "question"
-            );
+        const explainQuestion =
+            document.getElementById("explainQuestion");
 
-
-        const explanationElement =
-            document.getElementById(
-                "explanation"
-            );
-
-
-        const backButton =
-            document.getElementById(
-                "backButton"
-            );
+        const explainContent =
+            document.getElementById("explainContent");
 
         const detailButton =
-            document.getElementById(
-                "detailButton"
-            );
+            document.getElementById("detailButton");
+
+        const backButton =
+            document.getElementById("backButton");
 
 
-        const params =
-            new URLSearchParams(
-                window.location.search
-            );
+        /*
+         * 当前问题的唯一来源：
+         *
+         * 第一优先级：
+         * explain.html?question=xxxx
+         *
+         * 第二优先级：
+         * sessionStorage
+         *
+         * 这样即使从 detail 返回，
+         * explain 也不会因为内存状态丢失而变空。
+         */
 
+        function getCurrentQuestion() {
 
-        const question =
-            params.get("question");
+            const params =
+                new URLSearchParams(
+                    window.location.search
+                );
 
+            const urlQuestion =
+                params.get("question");
 
-        if (!question) {
+            if (urlQuestion) {
 
-            questionElement.textContent =
-                "没有找到问题";
+                sessionStorage.setItem(
+                    "whyQuestion",
+                    urlQuestion
+                );
 
-            explanationElement.innerHTML =
-                `
-                <div class="error">
-                    请返回上一页重新生成。
-                </div>
-                `;
+                return urlQuestion;
+            }
 
-        } else {
+            const savedQuestion =
+                sessionStorage.getItem(
+                    "whyQuestion"
+                );
 
-            questionElement.textContent =
-                question;
-
-            generateExplanation(
-                question
-            );
+            return savedQuestion || "";
         }
 
 
+        function showError(message) {
 
-        async function generateExplanation(
-            question
-        ) {
+            explainContent.textContent =
+                message;
+
+            detailButton.style.display =
+                "none";
+        }
+
+
+        async function loadExplanation() {
+
+            const question =
+                getCurrentQuestion();
+
+            if (!question) {
+
+                explainQuestion.textContent =
+                    "没有找到问题";
+
+                showError(
+                    "无法打开解释：当前页面没有找到问题。"
+                );
+
+                return;
+            }
+
+
+            explainQuestion.textContent =
+                question;
+
+            explainContent.textContent =
+                "正在生成解释……";
+
 
             try {
 
                 const response =
                     await fetch(
-                        "https://why-api.cgfe10231.workers.dev/api/explain",
+                        API_BASE + "/api/explain",
                         {
                             method: "POST",
 
@@ -123,8 +136,7 @@
                             },
 
                             body: JSON.stringify({
-                                question:
-                                    question
+                                question: question
                             })
                         }
                     );
@@ -142,144 +154,63 @@
                     await response.json();
 
 
-                if (
-                    !data.explanation
-                ) {
+                if (!data.explanation) {
 
                     throw new Error(
-                        "没有收到解释"
+                        "服务器没有返回解释"
                     );
                 }
 
 
-                renderExplanation(
-                    data.explanation
-                );
+                explainContent.textContent =
+                    data.explanation;
 
+
+                /*
+                 * 进入详细解释时，
+                 * 不使用 history，
+                 * 直接把当前问题写进 URL。
+                 */
+
+                detailButton.style.display =
+                    "block";
+
+                detailButton.onclick =
+                    () => {
+
+                        window.location.href =
+                            "detail.html?question=" +
+                            encodeURIComponent(
+                                question
+                            );
+                    };
 
             } catch (error) {
 
                 console.error(error);
 
-                explanationElement.innerHTML =
-                    `
-                    <div class="error">
-                        解释生成失败，请返回后重试。
-                    </div>
-                    `;
+                showError(
+                    "生成解释失败，请再试一次。"
+                );
             }
         }
 
 
+        /*
+         * 解释页永远明确回首页。
+         *
+         * 不再使用 history.back()
+         */
 
-        function renderExplanation(
-            explanation
-        ) {
+        backButton.onclick =
+            () => {
 
-            explanationElement.innerHTML =
-                "";
-
-
-            // 核心回答
-
-            const summary =
-                document.createElement(
-                    "div"
-                );
-
-            summary.className =
-                "explanation-summary";
-
-            summary.textContent =
-                explanation.summary;
-
-            explanationElement.appendChild(
-                summary
-            );
+                window.location.href =
+                    "index.html";
+            };
 
 
-            // 分点
-
-            explanation.points.forEach(
-                (point, index) => {
-
-                    const block =
-                        document.createElement(
-                            "section"
-                        );
-
-                    block.className =
-                        "explanation-point";
-
-
-                    const title =
-                        document.createElement(
-                            "h2"
-                        );
-
-                    title.textContent =
-                        `${index + 1}. ${point.title}`;
-
-
-                    const content =
-                        document.createElement(
-                            "p"
-                        );
-
-                    content.textContent =
-                        point.content;
-
-
-                    block.appendChild(
-                        title
-                    );
-
-                    block.appendChild(
-                        content
-                    );
-
-
-                    explanationElement.appendChild(
-                        block
-                    );
-                }
-            );
-
-
-            // 总结
-
-            const conclusion =
-                document.createElement(
-                    "div"
-                );
-
-            conclusion.className =
-                "explanation-conclusion";
-
-            conclusion.textContent =
-                explanation.conclusion;
-
-
-            explanationElement.appendChild(
-                conclusion
-            );
-        }
-
-
-
-        detailButton.addEventListener(
-    "click",
-    () => {
-
-        window.location.href =
-            "detail.html?question=" +
-            encodeURIComponent(
-                question
-            );
-
-    }
-);
-
+        loadExplanation();
     </script>
 
 </body>
