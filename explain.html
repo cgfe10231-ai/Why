@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>解释</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <main class="explain-page">
+
+        <h1 id="questionTitle"></h1>
+
+        <p id="answer">
+            这里以后放解释。
+        </p>
+
+        <button onclick="history.back()">返回</button>
+
+    </main>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const question = params.get("question");
+
+        document.getElementById("questionTitle").textContent =
+            question || "没有问题";
+    </script>
+
+</body>
+</html>
