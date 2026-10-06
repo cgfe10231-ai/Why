@@ -1,11 +1,18 @@
-const button = document.getElementById("whyButton");
-const question = document.getElementById("question");
+const button =
+    document.getElementById("whyButton");
+
+const question =
+    document.getElementById("question");
+
 
 const API_BASE =
     "https://why-api.cgfe10231.workers.dev";
 
 
-button.addEventListener("click", generateWhy);
+button.addEventListener(
+    "click",
+    generateWhy
+);
 
 
 async function generateWhy() {
@@ -19,65 +26,96 @@ async function generateWhy() {
 
     try {
 
-        const response = await fetch(
-            API_BASE + "/api/why",
-            {
-                method: "POST",
+        const response =
+            await fetch(
+                API_BASE + "/api/why",
+                {
+                    method: "POST",
 
-                headers: {
-                    "Content-Type": "application/json"
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    }
                 }
-            }
-        );
+            );
+
+
+        const responseText =
+            await response.text();
 
 
         if (!response.ok) {
+
             throw new Error(
-                "问题生成失败"
+                `HTTP ${response.status}\n${responseText}`
             );
         }
 
 
-        const data =
-            await response.json();
+        let data;
+
+
+        try {
+
+            data =
+                JSON.parse(
+                    responseText
+                );
+
+        } catch (error) {
+
+            throw new Error(
+                "Worker 返回的不是 JSON：\n" +
+                responseText
+            );
+        }
 
 
         if (!data.question) {
+
             throw new Error(
-                "服务器没有返回问题"
+                "Worker 没有返回 question：\n" +
+                responseText
             );
         }
 
 
         const selectedQuestion =
-            data.question;
+            data.question.trim();
 
 
         question.textContent =
             selectedQuestion;
+
 
         question.classList.add(
             "visible"
         );
 
 
-        question.onclick = () => {
+        question.onclick =
+            () => {
 
-            window.location.href =
-                "explain.html?question=" +
-                encodeURIComponent(
-                    selectedQuestion
-                );
-
-        };
+                window.location.href =
+                    "explain.html?question=" +
+                    encodeURIComponent(
+                        selectedQuestion
+                    );
+            };
 
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            "WHY ERROR:",
+            error
+        );
+
 
         question.textContent =
-            "生成失败，请再试一次。";
+            "生成失败：\n" +
+            error.message;
+
 
         question.classList.add(
             "visible"
