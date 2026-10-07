@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>为什么 - 解释</title>
+
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -12,7 +14,9 @@
 
     <main class="why-page">
 
-        <h1 id="explainQuestion">正在加载问题……</h1>
+        <h1 id="explainQuestion">
+            正在加载问题……
+        </h1>
 
         <div id="explainContent">
             正在生成解释……
@@ -28,9 +32,12 @@
 
     </main>
 
+
     <script>
+
         const API_BASE =
             "https://why-api.cgfe10231.workers.dev";
+
 
         const explainQuestion =
             document.getElementById("explainQuestion");
@@ -46,16 +53,9 @@
 
 
         /*
-         * 当前问题的唯一来源：
-         *
-         * 第一优先级：
-         * explain.html?question=xxxx
-         *
-         * 第二优先级：
-         * sessionStorage
-         *
-         * 这样即使从 detail 返回，
-         * explain 也不会因为内存状态丢失而变空。
+         * ==========================
+         * 获取当前问题
+         * ==========================
          */
 
         function getCurrentQuestion() {
@@ -68,6 +68,7 @@
             const urlQuestion =
                 params.get("question");
 
+
             if (urlQuestion) {
 
                 sessionStorage.setItem(
@@ -78,38 +79,260 @@
                 return urlQuestion;
             }
 
+
             const savedQuestion =
                 sessionStorage.getItem(
                     "whyQuestion"
                 );
 
+
             return savedQuestion || "";
         }
 
 
-        function showError(message) {
+        /*
+         * ==========================
+         * 把 AI 返回的数据变成人能看的文字
+         * ==========================
+         *
+         * 解决：
+         *
+         * [object Object]
+         *
+         * 不允许对象直接塞进 textContent。
+         */
 
-            explainContent.textContent =
-                message;
+        function renderValue(
+            value,
+            level = 0
+        ) {
 
-            detailButton.style.display =
-                "none";
+            if (
+                value === null ||
+                value === undefined
+            ) {
+
+                return "";
+            }
+
+
+            /*
+             * 字符串
+             */
+
+            if (
+                typeof value === "string"
+            ) {
+
+                return `
+                    <p>
+                        ${escapeHtml(value)}
+                    </p>
+                `;
+            }
+
+
+            /*
+             * 数字 / 布尔
+             */
+
+            if (
+                typeof value === "number" ||
+                typeof value === "boolean"
+            ) {
+
+                return `
+                    <p>
+                        ${escapeHtml(
+                    String(value)
+                )}
+                    </p>
+                `;
+            }
+
+
+            /*
+             * 数组
+             */
+
+            if (
+                Array.isArray(value)
+            ) {
+
+                let html = "";
+
+
+                for (
+                    const item of value
+                ) {
+
+                    html +=
+                        renderValue(
+                            item,
+                            level + 1
+                        );
+                }
+
+
+                return html;
+            }
+
+
+            /*
+             * 对象
+             */
+
+            if (
+                typeof value === "object"
+            ) {
+
+                let html = "";
+
+
+                for (
+                    const [
+                        key,
+                        item
+                    ] of Object.entries(value)
+                ) {
+
+                    /*
+                     * 不把一些技术字段直接展示出来。
+                     */
+
+                    if (
+                        key === "id" ||
+                        key === "type"
+                    ) {
+
+                        continue;
+                    }
+
+
+                    const title =
+                        prettyKey(key);
+
+
+                    html += `
+                        <section>
+
+                            <h2>
+                                ${escapeHtml(
+                        title
+                    )}
+                            </h2>
+
+                            <div>
+                                ${renderValue(
+                        item,
+                        level + 1
+                    )
+                        }
+                            </div>
+
+                        </section>
+                    `;
+                }
+
+
+                return html;
+            }
+
+
+            return "";
         }
 
+
+        /*
+         * 把英文 JSON 字段变成页面标题。
+         */
+
+        function prettyKey(key) {
+
+            const map = {
+
+                summary:
+                    "核心解释",
+
+                mechanism:
+                    "作用机制",
+
+                causes:
+                    "原因",
+
+                cause:
+                    "原因",
+
+                conditions:
+                    "成立条件",
+
+                condition:
+                    "成立条件",
+
+                examples:
+                    "具体例子",
+
+                example:
+                    "具体例子",
+
+                misconceptions:
+                    "常见误解",
+
+                conclusion:
+                    "结论",
+
+                evidence:
+                    "证据",
+
+                explanation:
+                    "解释",
+
+                details:
+                    "详细说明"
+            };
+
+
+            return map[key] || key;
+        }
+
+
+        /*
+         * HTML 转义
+         */
+
+        function escapeHtml(value) {
+
+            return String(value)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+
+        /*
+         * ==========================
+         * 加载解释
+         * ==========================
+         */
 
         async function loadExplanation() {
 
             const question =
                 getCurrentQuestion();
 
+
             if (!question) {
 
                 explainQuestion.textContent =
                     "没有找到问题";
 
-                showError(
-                    "无法打开解释：当前页面没有找到问题。"
-                );
+                explainContent.textContent =
+                    "无法打开解释：没有找到当前问题。";
+
+                detailButton.style.display =
+                    "none";
 
                 return;
             }
@@ -118,15 +341,17 @@
             explainQuestion.textContent =
                 question;
 
-            explainContent.textContent =
-                "正在生成解释……";
+
+            explainContent.innerHTML =
+                "<p>正在生成解释……</p>";
 
 
             try {
 
                 const response =
                     await fetch(
-                        API_BASE + "/api/explain",
+                        API_BASE +
+                        "/api/explain",
                         {
                             method: "POST",
 
@@ -136,44 +361,86 @@
                             },
 
                             body: JSON.stringify({
-                                question: question
+                                question:
+                                    question
                             })
                         }
                     );
 
 
+                const rawText =
+                    await response.text();
+
+
+                console.log(
+                    "EXPLAIN RAW:",
+                    rawText
+                );
+
+
                 if (!response.ok) {
 
                     throw new Error(
+                        rawText ||
                         "解释生成失败"
                     );
                 }
 
 
-                const data =
-                    await response.json();
+                let data;
 
 
-                if (!data.explanation) {
+                try {
+
+                    data =
+                        JSON.parse(
+                            rawText
+                        );
+
+                } catch {
 
                     throw new Error(
-                        "服务器没有返回解释"
+                        "解释接口返回的不是合法 JSON：" +
+                        rawText
                     );
                 }
 
 
-                explainContent.textContent =
-                    data.explanation;
+                if (
+                    data.explanation ===
+                    undefined ||
+                    data.explanation ===
+                    null
+                ) {
+
+                    throw new Error(
+                        "服务器没有返回 explanation：" +
+                        rawText
+                    );
+                }
 
 
                 /*
-                 * 进入详细解释时，
-                 * 不使用 history，
-                 * 直接把当前问题写进 URL。
+                 * 这里不再使用：
+                 *
+                 * textContent = data.explanation
+                 *
+                 * 因为 explanation 可能是对象。
+                 */
+
+                explainContent.innerHTML =
+                    renderValue(
+                        data.explanation
+                    );
+
+
+                /*
+                 * 详细解释
                  */
 
                 detailButton.style.display =
                     "block";
+
 
                 detailButton.onclick =
                     () => {
@@ -185,19 +452,28 @@
                             );
                     };
 
+
             } catch (error) {
 
-                console.error(error);
-
-                showError(
-                    "生成解释失败，请再试一次。"
+                console.error(
+                    error
                 );
+
+
+                explainContent.innerHTML = `
+                    <p>
+                        ${escapeHtml(
+                    error.message
+                )
+                    }
+                    </p>
+                `;
             }
         }
 
 
         /*
-         * 解释页永远明确回首页。
+         * 解释页返回首页。
          *
          * 不再使用 history.back()
          */
@@ -211,6 +487,7 @@
 
 
         loadExplanation();
+
     </script>
 
 </body>
